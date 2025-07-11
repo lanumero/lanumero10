@@ -202,7 +202,7 @@ class FootballAPITester:
                         if len(data) > 0:
                             # Validate session structure
                             first_session = data[0]
-                            required_fields = ['id', 'mesocicloId', 'semana', 'sesiones']
+                            required_fields = ['id', 'mesociclo_id', 'semana', 'sesiones']
                             missing_fields = [field for field in required_fields if field not in first_session]
                             
                             if not missing_fields:
