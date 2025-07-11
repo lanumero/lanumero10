@@ -1,15 +1,16 @@
-from fastapi import FastAPI, APIRouter
+from fastapi import FastAPI, APIRouter, HTTPException, Depends
+from fastapi.responses import JSONResponse
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
 import os
 import logging
 from pathlib import Path
-from pydantic import BaseModel, Field
 from typing import List
-import uuid
-from datetime import datetime
 
+# Import models and services
+from models.mesociclo import Mesociclo, MesocicloDetalle, SemanaEntrenamiento, PlanificacionCompleta
+from services.football_service import FootballService
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
@@ -20,37 +21,115 @@ client = AsyncIOMotorClient(mongo_url)
 db = client[os.environ['DB_NAME']]
 
 # Create the main app without a prefix
-app = FastAPI()
+app = FastAPI(title="Football Training API", version="1.0.0")
 
 # Create a router with the /api prefix
 api_router = APIRouter(prefix="/api")
 
+# Initialize service
+football_service = FootballService(db)
 
-# Define Models
-class StatusCheck(BaseModel):
-    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
-    client_name: str
-    timestamp: datetime = Field(default_factory=datetime.utcnow)
+# Dependency to get the football service
+async def get_football_service():
+    return football_service
 
-class StatusCheckCreate(BaseModel):
-    client_name: str
-
-# Add your routes to the router instead of directly to app
+# Health check endpoint
 @api_router.get("/")
 async def root():
-    return {"message": "Hello World"}
+    return {"message": "Football Training API is running"}
 
-@api_router.post("/status", response_model=StatusCheck)
-async def create_status_check(input: StatusCheckCreate):
-    status_dict = input.dict()
-    status_obj = StatusCheck(**status_dict)
-    _ = await db.status_checks.insert_one(status_obj.dict())
-    return status_obj
+# Get all mesociclos
+@api_router.get("/mesociclos", response_model=List[Mesociclo])
+async def get_mesociclos(service: FootballService = Depends(get_football_service)):
+    try:
+        mesociclos = await service.get_all_mesociclos()
+        return mesociclos
+    except Exception as e:
+        logger.error(f"Error getting mesociclos: {e}")
+        raise HTTPException(status_code=500, detail="Error retrieving mesociclos")
 
-@api_router.get("/status", response_model=List[StatusCheck])
-async def get_status_checks():
-    status_checks = await db.status_checks.find().to_list(1000)
-    return [StatusCheck(**status_check) for status_check in status_checks]
+# Get specific mesociclo
+@api_router.get("/mesociclos/{mesociclo_id}", response_model=Mesociclo)
+async def get_mesociclo(mesociclo_id: int, service: FootballService = Depends(get_football_service)):
+    try:
+        mesociclo = await service.get_mesociclo_by_id(mesociclo_id)
+        if not mesociclo:
+            raise HTTPException(status_code=404, detail="Mesociclo not found")
+        return mesociclo
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting mesociclo {mesociclo_id}: {e}")
+        raise HTTPException(status_code=500, detail="Error retrieving mesociclo")
+
+# Get mesociclo with full details
+@api_router.get("/mesociclos/{mesociclo_id}/detalle", response_model=MesocicloDetalle)
+async def get_mesociclo_detalle(mesociclo_id: int, service: FootballService = Depends(get_football_service)):
+    try:
+        detalle = await service.get_mesociclo_detalle(mesociclo_id)
+        if not detalle:
+            raise HTTPException(status_code=404, detail="Mesociclo not found")
+        return detalle
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting mesociclo detalle {mesociclo_id}: {e}")
+        raise HTTPException(status_code=500, detail="Error retrieving mesociclo details")
+
+# Get sesiones for a specific mesociclo
+@api_router.get("/mesociclos/{mesociclo_id}/sesiones", response_model=List[SemanaEntrenamiento])
+async def get_sesiones_mesociclo(mesociclo_id: int, service: FootballService = Depends(get_football_service)):
+    try:
+        sesiones = await service.get_sesiones_by_mesociclo(mesociclo_id)
+        return sesiones
+    except Exception as e:
+        logger.error(f"Error getting sesiones for mesociclo {mesociclo_id}: {e}")
+        raise HTTPException(status_code=500, detail="Error retrieving sesiones")
+
+# Get complete planificacion
+@api_router.get("/planificacion", response_model=PlanificacionCompleta)
+async def get_planificacion(service: FootballService = Depends(get_football_service)):
+    try:
+        planificacion = await service.get_planificacion_completa()
+        if not planificacion:
+            raise HTTPException(status_code=404, detail="Planificación not found")
+        return planificacion
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting planificacion: {e}")
+        raise HTTPException(status_code=500, detail="Error retrieving planificación")
+
+# Material básico endpoint
+@api_router.get("/material-basico")
+async def get_material_basico():
+    try:
+        material = [
+            "Balones de fútbol (nº 3 o 4)",
+            "Conos de diferentes colores",
+            "Petos o camisetas de entrenamiento",
+            "Porterías pequeñas (portátiles)",
+            "Aros de coordinación",
+            "Escalera de coordinación",
+            "Silbato",
+            "Cronómetro",
+            "Bidones de agua",
+            "Botiquín básico"
+        ]
+        return {"material": material}
+    except Exception as e:
+        logger.error(f"Error getting material básico: {e}")
+        raise HTTPException(status_code=500, detail="Error retrieving material básico")
+
+# Initialize data endpoint (for setup)
+@api_router.post("/init-data")
+async def init_data(service: FootballService = Depends(get_football_service)):
+    try:
+        await service.init_data()
+        return {"message": "Data initialized successfully"}
+    except Exception as e:
+        logger.error(f"Error initializing data: {e}")
+        raise HTTPException(status_code=500, detail="Error initializing data")
 
 # Include the router in the main app
 app.include_router(api_router)
@@ -70,6 +149,18 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+# Event handlers
+@app.on_event("startup")
+async def startup_event():
+    logger.info("Football Training API starting up...")
+    try:
+        # Initialize data on startup
+        await football_service.init_data()
+        logger.info("Data initialization completed")
+    except Exception as e:
+        logger.error(f"Error during startup: {e}")
+
 @app.on_event("shutdown")
 async def shutdown_db_client():
+    logger.info("Football Training API shutting down...")
     client.close()
