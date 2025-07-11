@@ -158,7 +158,7 @@ class FootballService:
             sesiones_data = [
                 {
                     "id": 1,
-                    "mesocicloId": 1,
+                    "mesociclo_id": 1,
                     "semana": 1,
                     "sesiones": [
                         {
