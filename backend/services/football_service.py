@@ -36,7 +36,7 @@ class FootballService:
     async def get_sesiones_by_mesociclo(self, mesociclo_id: int) -> List[SemanaEntrenamiento]:
         """Obtener sesiones de un mesociclo específico"""
         try:
-            cursor = self.sesiones_collection.find({"mesocicloId": mesociclo_id})
+            cursor = self.sesiones_collection.find({"mesociclo_id": mesociclo_id})
             sesiones_data = await cursor.to_list(length=None)
             return [SemanaEntrenamiento(**sesion) for sesion in sesiones_data]
         except Exception as e:
