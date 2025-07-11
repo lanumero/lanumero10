@@ -1,16 +1,52 @@
-import React, { useState } from 'react';
-import { Calendar, Users, Target, BookOpen, Clock, MapPin } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Calendar, Users, Target, BookOpen, Clock, MapPin, Loader2 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
-import { mesociclos, sesionesSemanales, materialBasico } from '../data/mockData';
+import { footballAPI } from '../services/apiService';
 import MesociclosView from './MesociclosView';
 import SesionDetalle from './SesionDetalle';
+import { useToast } from '../hooks/use-toast';
 
 const Dashboard = () => {
   const [vistaActual, setVistaActual] = useState('dashboard');
   const [mesocicloSeleccionado, setMesocicloSeleccionado] = useState(null);
   const [sesionSeleccionada, setSesionSeleccionada] = useState(null);
+  const [mesociclos, setMesociclos] = useState([]);
+  const [materialBasico, setMaterialBasico] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const { toast } = useToast();
+
+  useEffect(() => {
+    loadData();
+  }, []);
+
+  const loadData = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      
+      // Load mesociclos and material básico
+      const [mesociclosData, materialData] = await Promise.all([
+        footballAPI.getMesociclos(),
+        footballAPI.getMaterialBasico()
+      ]);
+      
+      setMesociclos(mesociclosData);
+      setMaterialBasico(materialData);
+    } catch (err) {
+      console.error('Error loading data:', err);
+      setError('Error cargando los datos. Por favor, intenta de nuevo.');
+      toast({
+        title: "Error",
+        description: "No se pudieron cargar los datos. Verifica tu conexión.",
+        variant: "destructive"
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleMesocicloClick = (mesociclo) => {
     setMesocicloSeleccionado(mesociclo);
@@ -32,6 +68,33 @@ const Dashboard = () => {
     setVistaActual('mesociclo');
     setSesionSeleccionada(null);
   };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-green-50 via-blue-50 to-white flex items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="h-12 w-12 text-green-500 animate-spin mx-auto mb-4" />
+          <p className="text-xl text-gray-600">Cargando planificación...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-green-50 via-blue-50 to-white flex items-center justify-center">
+        <div className="text-center">
+          <div className="bg-red-100 border border-red-400 text-red-700 px-6 py-4 rounded-lg mb-4">
+            <h2 className="text-xl font-bold mb-2">Error de conexión</h2>
+            <p>{error}</p>
+          </div>
+          <Button onClick={loadData} className="bg-green-500 hover:bg-green-600">
+            Intentar de nuevo
+          </Button>
+        </div>
+      </div>
+    );
+  }
 
   if (vistaActual === 'sesion' && sesionSeleccionada) {
     return (
@@ -128,7 +191,7 @@ const Dashboard = () => {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold text-purple-600">5</div>
+              <div className="text-3xl font-bold text-purple-600">{mesociclos.length}</div>
               <p className="text-sm text-gray-600 mt-1">
                 Progresión estructurada
               </p>

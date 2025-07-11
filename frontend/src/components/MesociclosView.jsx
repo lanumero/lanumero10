@@ -1,16 +1,80 @@
-import React from 'react';
-import { ArrowLeft, Calendar, Clock, Users, Target, PlayCircle } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { ArrowLeft, Calendar, Clock, Users, Target, PlayCircle, Loader2 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
-import { sesionesSemanales, objetivosPorMes } from '../data/mockData';
+import { footballAPI } from '../services/apiService';
+import { useToast } from '../hooks/use-toast';
 
 const MesociclosView = ({ mesociclo, onVolver, onSesionClick }) => {
-  const sesionesDelMesociclo = sesionesSemanales.filter(
-    semana => semana.mesocicloId === mesociclo.id
-  );
+  const [mesocicloDetalle, setMesocicloDetalle] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const { toast } = useToast();
 
-  const objetivos = objetivosPorMes[mesociclo.id] || [];
+  useEffect(() => {
+    loadMesocicloDetalle();
+  }, [mesociclo.id]);
+
+  const loadMesocicloDetalle = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      
+      const detalle = await footballAPI.getMesocicloDetalle(mesociclo.id);
+      setMesocicloDetalle(detalle);
+    } catch (err) {
+      console.error('Error loading mesociclo detalle:', err);
+      setError('Error cargando el detalle del mesociclo');
+      toast({
+        title: "Error",
+        description: "No se pudo cargar el detalle del mesociclo.",
+        variant: "destructive"
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-green-50 via-blue-50 to-white flex items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="h-12 w-12 text-green-500 animate-spin mx-auto mb-4" />
+          <p className="text-xl text-gray-600">Cargando mesociclo...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-green-50 via-blue-50 to-white flex items-center justify-center">
+        <div className="text-center">
+          <div className="bg-red-100 border border-red-400 text-red-700 px-6 py-4 rounded-lg mb-4">
+            <h2 className="text-xl font-bold mb-2">Error</h2>
+            <p>{error}</p>
+          </div>
+          <Button onClick={onVolver} className="bg-green-500 hover:bg-green-600">
+            Volver al Dashboard
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  if (!mesocicloDetalle) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-green-50 via-blue-50 to-white flex items-center justify-center">
+        <div className="text-center">
+          <p className="text-xl text-gray-600">No se encontraron datos del mesociclo</p>
+          <Button onClick={onVolver} className="mt-4 bg-green-500 hover:bg-green-600">
+            Volver al Dashboard
+          </Button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-green-50 via-blue-50 to-white p-4">
@@ -66,7 +130,7 @@ const MesociclosView = ({ mesociclo, onVolver, onSesionClick }) => {
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              {objetivos.map((objetivo, index) => (
+              {mesocicloDetalle.objetivos.map((objetivo, index) => (
                 <div key={index} className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
                   <div className="w-2 h-2 bg-green-500 rounded-full flex-shrink-0"></div>
                   <span className="text-gray-700">{objetivo}</span>
@@ -106,7 +170,7 @@ const MesociclosView = ({ mesociclo, onVolver, onSesionClick }) => {
             Sesiones Semanales
           </h2>
           
-          {sesionesDelMesociclo.map((semana) => (
+          {mesocicloDetalle.sesiones_semanales.map((semana) => (
             <Card key={semana.id} className="mb-6 bg-white shadow-lg border-0">
               <CardHeader>
                 <CardTitle className="text-lg font-semibold text-gray-800">
