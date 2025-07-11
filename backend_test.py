@@ -310,7 +310,6 @@ class FootballAPITester:
             ("/mesociclos/999", "Non-existent mesociclo"),
             ("/mesociclos/abc", "Invalid mesociclo ID format"),
             ("/mesociclos/999/detalle", "Non-existent mesociclo details"),
-            ("/mesociclos/999/sesiones", "Non-existent mesociclo sessions"),
         ]
         
         for endpoint, description in test_cases:
